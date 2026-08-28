@@ -7,7 +7,7 @@ hinge pin stock, but every dimension is parametric.
 ![Rod holder](images/rod_holder.png)
 
 - 2 grid cells wide, 6 cells tall: 55.6 x 167.6 x 16.7 mm
-- 4 compartments, 11.7 mm square, 165.6 mm deep
+- 4 compartments, 11.7 mm square, 165.6 mm deep, rounded inside
 - Card label pocket above each compartment
 - Mounts on 4 snaps: two at the top, two at the bottom
 - Tiles in both directions, so a wall of them lines up
@@ -75,6 +75,38 @@ Change `bore_depth` and they move to suit.
 
 ---
 
+## Rounding
+
+![Detail](images/rod_holder_detail.png)
+
+*Rounded outer edges, rounded compartment corners, and the lead-in at each mouth.*
+
+Outside, the two front vertical edges are rounded by `outer_round`, the top and
+bottom edges by `end_round`. Inside, the compartment corners are rounded by
+`inner_round` and there is a fillet where the walls meet the floor.
+
+Two edges cannot simply be rounded, for reasons worth knowing before you change
+the values:
+
+**The back edges.** Rounding the back face perimeter eats into the flat area the
+snaps root into. The snaps reach 26.4 mm from the centre and the pot half-width
+is 27.8 mm, so anything above 1.4 mm would undercut them. `back_round` defaults
+to 1.2 and is checked by an assert.
+
+**The front face perimeter.** The front face is the bed when printing. A fillet
+tangent to the bed leaves the first layers as a near-horizontal overhang, which
+prints badly. So the rounding is cut back to 45 degrees where it runs into that
+face, by `front_chamfer`. This catches the side edges and the top and bottom
+edges in one operation. Set `front_chamfer = 0` for an unbroken round, and print
+with support.
+
+The mouth lead-in grows every compartment sideways, so two neighbours eat into
+the divider between them from both sides. It is clamped to leave at least 0.4 mm
+on top of each divider, which means the effective lead-in can be smaller than
+`mouth_chamfer` asks for.
+
+---
+
 ## Card labels
 
 Each compartment gets a pocket in the front wall that holds a slip of card
@@ -112,7 +144,7 @@ Set `label_mode = "engraved"` to cut fixed text into the front face instead, or
 | `back_plate` | `3.0` | Back plate thickness, this is what the snaps hang off |
 | `floor_thickness` | `2.0` | Material under the compartments |
 | `compartment_depth` | `0` | Front to back size. `0` makes the compartments square |
-| `mouth_chamfer` | `1.0` | Lead-in at the mouth. Opens sideways and backwards only, so the front wall stays thick enough for the card pocket |
+| `mouth_chamfer` | `1.0` | Lead-in at the mouth. Opens sideways and backwards only, so the front wall stays thick enough for the card pocket. Clamped so it cannot eat the divider tops away |
 
 Compartment width is whatever is left over:
 
@@ -122,6 +154,17 @@ comp_w = (grid_cols * 28 - tile_clearance - 2 * wall
 ```
 
 which gives 11.7 mm at the defaults.
+
+### Rounding
+
+| Parameter | Default | Description |
+|---|---|---|
+| `outer_round` | `3.0` | Radius on the two front vertical edges, the ones you grip |
+| `back_round` | `1.2` | Radius on the two back vertical edges. Capped by the snap footprint, see above |
+| `end_round` | `2.0` | Radius on the top and bottom outer edges |
+| `front_chamfer` | `1.6` | 45 degree relief where the rounding meets the front face, so it prints off the bed. `0` gives an unbroken round |
+| `inner_round` | `2.0` | Radius on the inside vertical corners of each compartment |
+| `floor_round` | `2.0` | Radius where the compartment walls meet the floor |
 
 ### Labels
 
@@ -167,7 +210,7 @@ Following the [openGrid printing guide](https://www.opengrid.world/guides/printi
 - 15% infill or more
 - Do not use a draft or fast profile, it will ruin the snap tolerances
 
-Bed needs to fit 167.6 x 55.6 mm. About 79 cm3 of material at the defaults.
+Bed needs to fit 167.6 x 55.6 mm. About 81 cm3 of material at the defaults.
 
 **Print one snap first.** Run the library's tile and snap examples and check the
 fit by hand before committing to a 168 mm part.

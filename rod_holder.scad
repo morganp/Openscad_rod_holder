@@ -49,8 +49,27 @@ back_plate = 3.0;
 floor_thickness = 2.0;
 // compartment size front to back. 0 makes them square
 compartment_depth = 0;
-// 45 degree lead in at the mouth of each compartment
+// Lead in at the mouth of each compartment. Clamped so it cannot eat the tops
+// of the dividers away, so the effective value may be smaller than this
 mouth_chamfer = 1.0;
+
+/* [Rounding] */
+// radius on the two front vertical edges, the ones you actually grip
+outer_round = 3.0;
+// radius on the two back vertical edges. Kept small: the back face has to stay
+// flat out to the edge of the snaps, which reach 26.4 mm from the centre
+back_round = 1.2;
+// radius on the top and bottom outer edges
+end_round = 2.0;
+// 45 degree relief around the front face. The front face is the bed when
+// printing, and a fillet tangent to the bed starts as a near horizontal
+// overhang, so the rounding is cut back to 45 degrees where it meets that face.
+// Set to 0 for an unbroken round, and print with support
+front_chamfer = 1.6;
+// radius on the inside vertical corners of each compartment
+inner_round = 2.0;
+// radius where the compartment walls meet the floor
+floor_round = 2.0;
 
 /* [Labels] */
 // card holds a slip of card behind a window, engraved cuts the text into the
@@ -104,6 +123,15 @@ comp_w   = (inner_w - (compartments - 1) * divider) / compartments;
 comp_d   = compartment_depth > 0 ? compartment_depth : comp_w;
 pot_d    = back_plate + comp_d + wall;
 
+// The mouth lead in grows every compartment sideways, so two neighbours eat
+// into the divider between them from both sides. Clamp it so the top of a
+// divider keeps at least divider_top_min of material rather than coming to a
+// knife edge, or vanishing entirely when 2 * mouth_chamfer exceeds divider.
+divider_top_min = 0.4;
+mouth = compartments > 1
+        ? min(mouth_chamfer, max(0, (divider - divider_top_min) / 2))
+        : mouth_chamfer;
+
 // Snap rows sit on the 28 mm grid and need 14 mm of clearance to a plate edge,
 // so push them as far apart as the height allows and centre the pair.
 snap_span = floor((pot_h - OG_PITCH) / OG_PITCH) * OG_PITCH;
@@ -115,14 +143,110 @@ assert(comp_w > 0, "compartments do not fit across the width, reduce compartment
 assert(pot_h >= OG_PITCH, "pot is too short to carry a snap row");
 assert(label_mode != "card" || wall > card_lip + card_thickness,
        "front wall is too thin for a card pocket, raise wall");
+assert(back_round <= pot_w / 2 - (OG_SNAP_FLAT / 2 + max(snap_xs)),
+       "back_round is too big, it would undercut the snaps");
+assert(inner_round < comp_w / 2 && inner_round < comp_d / 2,
+       "inner_round is too big for the compartment size");
+assert(outer_round + back_round < pot_d, "outer_round and back_round do not fit in the pot depth");
 
 // ---------------------------------------------------------------------------
 // Parts
 // ---------------------------------------------------------------------------
 
+/*
+ * rounded_extrude -- extrude a 2D profile with its top and bottom edges rolled
+ * over into a fillet.
+ *
+ * The fillet is made by lofting the profile through a quarter circle of inset
+ * values: at the very end the profile is pulled in by r, and r away from the
+ * end it is at full size. Both profiles used here are convex, so each hulled
+ * slice is an exact loft.
+ *
+ * Used for the outside of the pot, and on the compartment voids, where an inset
+ * void leaves a concave fillet in the solid.
+ */
+module rounded_extrude(h, r_bottom = 0, r_top = 0, steps = 8) {
+    if (h - r_bottom - r_top > 0)
+        translate([0, 0, r_bottom])
+            linear_extrude(h - r_bottom - r_top) children();
+
+    // z = r(1 - cos a) and inset = r(1 - sin a) sweeps a quarter circle as a
+    // runs from 0 at the end face to 90 where the profile reaches full size
+    if (r_bottom > 0)
+        for (i = [0 : steps - 1]) {
+            a0 = 90 * i / steps;
+            a1 = 90 * (i + 1) / steps;
+            hull() {
+                translate([0, 0, r_bottom * (1 - cos(a0))])
+                    linear_extrude(EPS) offset(r = -r_bottom * (1 - sin(a0))) children();
+                translate([0, 0, r_bottom * (1 - cos(a1)) - EPS])
+                    linear_extrude(EPS) offset(r = -r_bottom * (1 - sin(a1))) children();
+            }
+        }
+
+    if (r_top > 0)
+        for (i = [0 : steps - 1]) {
+            a0 = 90 * i / steps;
+            a1 = 90 * (i + 1) / steps;
+            hull() {
+                translate([0, 0, h - r_top * (1 - cos(a0)) - EPS])
+                    linear_extrude(EPS) offset(r = -r_top * (1 - sin(a0))) children();
+                translate([0, 0, h - r_top * (1 - cos(a1))])
+                    linear_extrude(EPS) offset(r = -r_top * (1 - sin(a1))) children();
+            }
+        }
+}
+
+/*
+ * The pot's cross section: a rectangle with the two front corners rounded by
+ * outer_round and the two back corners by back_round.
+ *
+ * The two radii are separate because the back face has to stay flat right out
+ * to the edge of the snaps, so it can only be softened a little, while the
+ * front edges are the ones in your hand and can be rounded properly.
+ */
+module pot_profile() {
+    hull() {
+        for (sx = [-1, 1]) {
+            translate([sx * (pot_w / 2 - back_round), back_round])
+                circle(r = back_round, $fn = 32);
+            translate([sx * (pot_w / 2 - outer_round), pot_d - outer_round])
+                circle(r = outer_round, $fn = 32);
+        }
+    }
+}
+
+/*
+ * Everything at or behind the front face, with a 45 degree relief running round
+ * that face.
+ *
+ * Intersecting the pot with this turns the fillets where they run into the
+ * front face into 45 degree chamfers. That matters because the front face is
+ * the bed when printing: a fillet tangent to the bed leaves the first layers as
+ * a near horizontal overhang, while 45 degrees prints cleanly. It catches the
+ * side edges and the top and bottom edges in one operation.
+ */
+module front_relief() {
+    c = front_chamfer;
+    if (c > 0)
+        hull() {
+            translate([-pot_w, -og_snap_depth(lite_board) - 1, 0])
+                cube([2 * pot_w, pot_d - c + og_snap_depth(lite_board) + 1, pot_h]);
+            translate([-(pot_w / 2 - c), pot_d - c, c])
+                cube([pot_w - 2 * c, c, pot_h - 2 * c]);
+        }
+    else
+        translate([-pot_w, -og_snap_depth(lite_board) - 1, 0])
+            cube([2 * pot_w, pot_d + og_snap_depth(lite_board) + 1, pot_h]);
+}
+
 // the outer block, before anything is hollowed out
 module pot_blank() {
-    translate([-pot_w / 2, 0, 0]) cube([pot_w, pot_d, pot_h]);
+    intersection() {
+        rounded_extrude(pot_h, r_bottom = end_round, r_top = end_round)
+            pot_profile();
+        front_relief();
+    }
 }
 
 // x position of the low-x edge of compartment i.
@@ -131,28 +255,42 @@ module pot_blank() {
 // compartment as you stand in front of it.
 function comp_x(i) = inner_w / 2 - (i + 1) * comp_w - i * divider;
 
+// cross section of one compartment, corners rounded by inner_round
+module comp_profile(i) {
+    r = inner_round;
+    if (r > 0)
+        offset(r = r)
+            translate([comp_x(i) + r, back_plate + r])
+                square([comp_w - 2 * r, comp_d - 2 * r]);
+    else
+        translate([comp_x(i), back_plate]) square([comp_w, comp_d]);
+}
+
 /*
- * One compartment void: a square bore with a 45 degree lead in at the mouth so
- * rods drop in without catching.
+ * One compartment void: a square bore with rounded inside corners, a fillet
+ * where the walls meet the floor, and a lead in at the mouth so rods drop in
+ * without catching.
  */
 module compartment_void(i) {
-    x = comp_x(i);
-    y = back_plate;
     z = floor_thickness;
-    h = bore;
+    z_top = z + bore;
 
-    translate([x, y, z]) cube([comp_w, comp_d, h + EPS]);
+    translate([0, 0, z])
+        rounded_extrude(bore + EPS, r_bottom = floor_round) comp_profile(i);
 
     // The lead in opens out sideways and towards the back, but not towards the
     // front: the front wall has to stay thick enough for the card pocket.
-    if (mouth_chamfer > 0)
-        translate([0, 0, z + h - mouth_chamfer])
+    if (mouth > 0)
+        intersection() {
             hull() {
-                translate([x, y, 0]) cube([comp_w, comp_d, EPS]);
-                translate([x - mouth_chamfer, y - mouth_chamfer, mouth_chamfer])
-                    cube([comp_w + 2 * mouth_chamfer,
-                          comp_d + mouth_chamfer, EPS]);
+                translate([0, 0, z_top - mouth])
+                    linear_extrude(EPS) comp_profile(i);
+                translate([0, 0, z_top - EPS])
+                    linear_extrude(EPS) offset(r = mouth) comp_profile(i);
             }
+            translate([-pot_w, -pot_d, z_top - mouth - 1])
+                cube([2 * pot_w, pot_d + back_plate + comp_d, mouth + 2]);
+        }
 }
 
 /*
