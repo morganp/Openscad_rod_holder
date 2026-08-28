@@ -6,10 +6,11 @@ hinge pin stock, but every dimension is parametric.
 
 ![Rod holder](images/rod_holder.png)
 
-- 2 grid cells wide (56 mm), 152 mm tall, 16.8 mm deep
-- 4 compartments, 11.8 mm square, 150 mm deep
-- Engraved diameter labels on the front face
+- 2 grid cells wide, 6 cells tall: 55.6 x 167.6 x 16.7 mm
+- 4 compartments, 11.7 mm square, 165.6 mm deep
+- Card label pocket above each compartment
 - Mounts on 4 snaps: two at the top, two at the bottom
+- Tiles in both directions, so a wall of them lines up
 
 ## Requirements
 
@@ -25,25 +26,66 @@ Then open `rod_holder.scad` in OpenSCAD.
 
 ---
 
+## Tiling
+
+![Tiling](images/rod_holder_tiling.png)
+
+*Four holders in a 2 x 2 block, with the board cells their snaps sit in shown behind.*
+
+The outer size is a whole number of grid cells **less `tile_clearance`**, taken
+off the outside so the snaps stay put. At the defaults the holder is 55.6 x
+167.6 mm and sits on a 56 x 168 mm footprint, which is 2 x 6 cells. Butt them up
+against each other and every snap still lands on the 28 mm grid, with 0.4 mm of
+air between neighbours so they do not rub.
+
+Vertical tiling is what `height_mode` is for:
+
+| `height_mode` | Height | Bore | Tiles vertically |
+|---|---|---|---|
+| `"grid"` (default) | Rounded up to a whole number of cells, 167.6 | 165.6 | Yes |
+| `"exact"` | `bore_depth + floor_thickness`, 152 | 150 | No |
+
+In `"grid"` mode `bore_depth` is a **minimum**. The height rounds up to the next
+whole cell and the spare goes into the bore, so asking for 150 mm gets you
+165.6 mm rather than 16 mm of dead plastic in the base. Use `"exact"` if you
+want the bore depth you asked for and do not care about stacking.
+
+---
+
 ## Layout
 
 The pot's back wall *is* the mounting plate, so there is no separate bracket.
-Snaps sit in the top and bottom rows only, 112 mm apart, which is 4 grid cells.
+Snaps sit in the top and bottom rows only.
 
 Snap centres have to land on the 28 mm grid and need 14 mm of clearance to any
-plate edge. For a 152 mm pot that works out as:
+plate edge, so the rows are pushed as far apart as the height allows and the
+pair is centred:
 
 ```
-snap_span = floor((152 - 28) / 28) * 28   = 112
-snap_z0   = (152 - 112) / 2               = 20
+snap_span = floor((pot_h - 28) / 28) * 28
+snap_z0   = (pot_h - snap_span) / 2
 ```
 
-so the rows sit at z = 20 and z = 132, with 20 mm of margin at each end. Change
-`bore_depth` and the rows move to suit automatically.
+At 167.6 mm tall that puts the rows 112 mm apart at z = 27.8 and z = 139.8.
+Change `bore_depth` and they move to suit.
 
 ![Section](images/rod_holder_section.png)
 
-*Cut through the middle: four full-depth bores, a 2 mm floor and the back plate the snaps hang off.*
+*Cut through the middle: four full-depth bores, the floor, and the back plate the snaps hang off.*
+
+---
+
+## Card labels
+
+Each compartment gets a pocket in the front wall that holds a slip of card
+behind a window. Cards drop in from the top of the pot and pull straight back
+out, so relabelling means writing a new slip rather than reprinting the holder.
+
+At the defaults the card is 11.7 x 12 mm with a 9.7 x 11 mm window, in a 0.7 mm
+slot. Cut a strip of 300 gsm card, or fold ordinary paper double.
+
+Set `label_mode = "engraved"` to cut fixed text into the front face instead, or
+`"none"` to leave it plain.
 
 ---
 
@@ -53,39 +95,48 @@ so the rows sit at z = 20 and z = 132, with 20 mm of margin at each end. Change
 
 | Parameter | Default | Description |
 |---|---|---|
-| `grid_cols` | `2` | How many grid cells wide. Sets the pot width, `grid_cols * 28` |
+| `grid_cols` | `2` | How many grid cells wide |
 | `lite_board` | `false` | `true` for a 4.0 mm Lite board, `false` for a 6.8 mm Full board |
 | `snap_clearance` | `0` | Raise to 0.05 to 0.1 if the snaps print tight |
+| `tile_clearance` | `0.4` | Gap left between neighbouring holders. Taken off the outside, the snaps stay on the grid |
+| `height_mode` | `"grid"` | `"grid"` rounds the height to whole cells so holders tile vertically. `"exact"` gives exactly `bore_depth + floor_thickness` |
 
 ### Pot
 
 | Parameter | Default | Description |
 |---|---|---|
-| `bore_depth` | `150` | Usable depth of each compartment |
+| `bore_depth` | `150` | Usable compartment depth. A minimum in `"grid"` mode |
 | `compartments` | `4` | Number of compartments across the width |
 | `wall` | `2.0` | Front and side wall thickness |
 | `divider` | `1.6` | Thickness of the walls between compartments |
 | `back_plate` | `3.0` | Back plate thickness, this is what the snaps hang off |
 | `floor_thickness` | `2.0` | Material under the compartments |
 | `compartment_depth` | `0` | Front to back size. `0` makes the compartments square |
-| `mouth_chamfer` | `1.0` | 45 degree lead-in at the mouth so rods drop in cleanly |
+| `mouth_chamfer` | `1.0` | Lead-in at the mouth. Opens sideways and backwards only, so the front wall stays thick enough for the card pocket |
 
 Compartment width is whatever is left over:
 
 ```
-comp_w = (grid_cols * 28 - 2 * wall - (compartments - 1) * divider) / compartments
+comp_w = (grid_cols * 28 - tile_clearance - 2 * wall
+          - (compartments - 1) * divider) / compartments
 ```
 
-which gives 11.8 mm at the defaults.
+which gives 11.7 mm at the defaults.
 
 ### Labels
 
 | Parameter | Default | Description |
 |---|---|---|
-| `labels` | `["0.5", "0.8", "1.0", "1.5"]` | One per compartment, left to right as mounted. `""` for none, extras are ignored |
-| `label_size` | `5` | Glyph height |
+| `label_mode` | `"card"` | `"card"`, `"engraved"` or `"none"` |
+| `card_height` | `12` | Height of the card pocket. Width follows the compartment |
+| `card_thickness` | `0.7` | Thickness of card the slot takes |
+| `card_lip` | `0.6` | Front frame that stops the card falling out |
+| `card_lip_margin` | `1.0` | How far that frame overlaps the card at the sides and bottom |
+| `card_side_gap` | `0.8` | Gap each side of the card. Twice this is the rib between neighbouring pockets, so keep it near half the divider thickness |
+| `labels` | `["0.5", "0.8", "1.0", "1.5"]` | Engraved mode only. Left to right as mounted |
+| `label_size` | `5` | Engraved glyph height |
 | `label_depth` | `0.6` | Engraving depth |
-| `label_inset` | `10` | Distance from the top of the pot down to the middle of the label |
+| `label_inset` | `10` | Engraved mode only, distance from the top down to the middle of the text |
 
 ### Output
 
@@ -104,7 +155,8 @@ Set `layout = "print"`. That lays the pot **front face down** with the snaps
 pointing up, which is the orientation this part wants:
 
 - every snap overhang is 45 degrees or shallower, so no support is needed
-- the engraved labels end up on the bed and come out crisp
+- the card pocket frames are on the bed and come out crisp, and the roof of each
+  pocket is a short flat bridge between two edges
 - the compartment bores run horizontally and need no bridging
 
 Following the [openGrid printing guide](https://www.opengrid.world/guides/printing/):
@@ -115,10 +167,10 @@ Following the [openGrid printing guide](https://www.opengrid.world/guides/printi
 - 15% infill or more
 - Do not use a draft or fast profile, it will ruin the snap tolerances
 
-Bed needs to fit 152 x 56 mm. About 74 cm3 of material at the defaults.
+Bed needs to fit 167.6 x 55.6 mm. About 79 cm3 of material at the defaults.
 
 **Print one snap first.** Run the library's tile and snap examples and check the
-fit by hand before committing to a 150 mm part.
+fit by hand before committing to a 168 mm part.
 
 ---
 
@@ -133,7 +185,7 @@ openscad --export-format=binstl -o mountfit.stl mountfit_check.scad
 ```
 
 This currently comes out at 0 mm3, so the snaps clear their cells everywhere at
-rest. `section_preview.scad` produces the cutaway image above.
+rest.
 
 ---
 
@@ -143,6 +195,7 @@ rest. `section_preview.scad` produces the cutaway image above.
 rod_holder.scad        -- the model
 mountfit_check.scad    -- snap-to-board interference check
 section_preview.scad   -- cutaway used for the README image
+tiling_preview.scad    -- 2 x 2 block used for the README image
 images/                -- rendered previews
 ```
 
