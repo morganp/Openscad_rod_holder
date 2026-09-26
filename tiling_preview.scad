@@ -4,7 +4,7 @@
 use <rod_holder.scad>
 include <opengrid/opengrid.scad>
 
-x_pitch = og_span(2);    // 56, two cells per holder
+x_pitch = og_span(1);    // 28, one cell per holder at the defaults
 z_pitch = og_span(6);    // 168, six cells per holder in grid height mode
 
 for (i = [0, 1], j = [0, 1])
