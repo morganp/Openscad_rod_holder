@@ -3,6 +3,14 @@
 All notable changes to this project. Versions follow
 [Semantic Versioning 2.0.0](https://semver.org).
 
+## 2.0.1 - 2026-09-26
+
+### Fixed
+- `// @github: morganp/openscad-opengrid` tag above each `include` of the
+  openGrid library, so the web OpenSCAD GUI deep link
+  (<https://lizard-spock.co.uk/openscad-gui/?github=morganp/Openscad_rod_holder/rod_holder.scad>)
+  fetches the library automatically. Desktop OpenSCAD sees a comment only.
+
 ## 2.0.0 - 2026-09-26
 
 ### Changed (breaking defaults)

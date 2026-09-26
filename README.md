@@ -33,6 +33,11 @@ git clone https://github.com/morganp/openscad-opengrid.git \
 
 Then open `rod_holder.scad` in OpenSCAD.
 
+Or open it in the browser with no install, library included:
+[rod_holder.scad in the web OpenSCAD GUI](https://lizard-spock.co.uk/openscad-gui/?github=morganp/Openscad_rod_holder/rod_holder.scad).
+The `// @github: morganp/openscad-opengrid` comment above the `include` tells
+the web GUI where to fetch the library from; desktop OpenSCAD ignores it.
+
 ---
 
 ## Tiling

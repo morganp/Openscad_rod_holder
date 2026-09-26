@@ -2,6 +2,7 @@
 // Four holders in a 2 x 2 block on a shared board, to show that the outer size
 // is a whole number of grid cells and everything still lands on the 28 mm grid.
 use <rod_holder.scad>
+// @github: morganp/openscad-opengrid
 include <opengrid/opengrid.scad>
 
 x_pitch = og_span(1);    // 28, one cell per holder at the defaults

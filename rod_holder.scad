@@ -21,6 +21,7 @@
  * sits side by side on the board with every snap still on the 28 mm grid.
  */
 
+// @github: morganp/openscad-opengrid
 include <opengrid/opengrid.scad>
 
 /* [openGrid] */

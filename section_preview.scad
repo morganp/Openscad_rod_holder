@@ -3,6 +3,7 @@
 // left hand column so the front and back bores, the floor, the diamond windows and the
 // snap seating are all visible at once.
 use <rod_holder.scad>
+// @github: morganp/openscad-opengrid
 include <opengrid/opengrid.scad>
 
 difference() {
